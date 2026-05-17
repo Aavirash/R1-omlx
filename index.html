@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=240,initial-scale=1.0,user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache,no-store,must-revalidate">
+<title>oMLX Stats</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:240px;height:282px;overflow:hidden;background:#0d0f12;color:#fff;font-family:-apple-system,system-ui,sans-serif;user-select:none;-webkit-user-select:none}
+
+/* ── dot matrix root ── */
+.dmx-root{display:inline-flex;align-items:center;justify-content:center;--dmx-cycle:1500ms;--dmx-opacity-base:0.12;--dmx-opacity-mid:0.35;--dmx-opacity-peak:1}
+.dmx-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-template-rows:repeat(5,minmax(0,1fr))}
+.dmx-dot{border-radius:999px;background:var(--dmx-fill,#00ee88);will-change:opacity}
+.dmx-inactive{opacity:0!important;animation:none!important}
+
+/* keyframes */
+.dmx-ripple{animation:dmx-ripple var(--dmx-cycle) cubic-bezier(0.42,0,0.58,1) infinite;animation-delay:calc(var(--d,0)*0.2333*var(--dmx-cycle))}
+@keyframes dmx-ripple{0%,100%{opacity:var(--dmx-opacity-base)}50%{opacity:var(--dmx-opacity-peak)}}
+
+.dmx-diag{animation:dmx-diag calc(var(--dmx-cycle)*1.2) linear infinite;animation-delay:calc(var(--d,0)*0.2*var(--dmx-cycle)*1.2)}
+@keyframes dmx-diag{0%,100%{opacity:calc(0.5*var(--dmx-opacity-base))}14%{opacity:var(--dmx-opacity-peak)}30%{opacity:calc(0.75*var(--dmx-opacity-base))}}
+
+.dmx-spiral{animation:dmx-spiral calc(var(--dmx-cycle)*1.5) linear infinite;animation-delay:calc(var(--d,0)*0.04*var(--dmx-cycle)*1.5)}
+@keyframes dmx-spiral{0%,100%{opacity:calc(0.5*var(--dmx-opacity-base))}8%{opacity:var(--dmx-opacity-peak)}16%{opacity:calc(0.5*var(--dmx-opacity-peak)+0.4*var(--dmx-opacity-mid))}32%{opacity:calc(0.5*var(--dmx-opacity-mid)+0.5*var(--dmx-opacity-base))}48%{opacity:calc(0.75*var(--dmx-opacity-base))}}
+
+.dmx-ring{animation:dmx-ring calc(var(--dmx-cycle)*1.3) linear infinite;animation-delay:calc(var(--d,0)*0.0625*var(--dmx-cycle)*1.3)}
+@keyframes dmx-ring{0%,100%{opacity:calc(0.5*var(--dmx-opacity-base))}10%{opacity:var(--dmx-opacity-peak)}25%{opacity:calc(0.45*var(--dmx-opacity-peak)+0.45*var(--dmx-opacity-mid))}40%{opacity:calc(0.875*var(--dmx-opacity-base))}}
+
+.dmx-wave{animation:dmx-wave calc(var(--dmx-cycle)*1.8) ease-in-out infinite;animation-delay:calc(var(--d,0)*0.08*var(--dmx-cycle)*1.8)}
+@keyframes dmx-wave{0%,100%{opacity:var(--dmx-opacity-base)}25%{opacity:var(--dmx-opacity-peak)}50%{opacity:var(--dmx-opacity-mid)}75%{opacity:var(--dmx-opacity-peak)}}
+
+.dmx-blink{animation:dmx-blink calc(var(--dmx-cycle)*0.6) steps(2,end) infinite;animation-delay:calc(var(--d,0)*0.1*var(--dmx-cycle)*0.6)}
+@keyframes dmx-blink{0%{opacity:var(--dmx-opacity-peak)}50%{opacity:var(--dmx-opacity-base)}}
+
+.dmx-sweep{animation:dmx-sweep calc(var(--dmx-cycle)*2) ease-in-out infinite;animation-delay:calc(var(--d,0)*0.125*var(--dmx-cycle)*2)}
+@keyframes dmx-sweep{0%,100%{opacity:var(--dmx-opacity-base)}30%{opacity:var(--dmx-opacity-peak)}60%{opacity:var(--dmx-opacity-mid)}}
+
+.dmx-pulse{animation:dmx-pulse calc(var(--dmx-cycle)*0.8) ease-in-out infinite;animation-delay:calc(var(--d,0)*0.06*var(--dmx-cycle)*0.8)}
+@keyframes dmx-pulse{0%,100%{opacity:var(--dmx-opacity-base)}20%{opacity:var(--dmx-opacity-peak)}40%{opacity:var(--dmx-opacity-mid)}}
+
+.dmx-echo{animation:dmx-echo calc(var(--dmx-cycle)*1.6) ease-in-out infinite;animation-delay:calc(var(--d,0)*0.1*var(--dmx-cycle)*1.6)}
+@keyframes dmx-echo{0%,100%{opacity:calc(0.6*var(--dmx-opacity-base))}28%{opacity:calc(0.98*var(--dmx-opacity-peak))}56%{opacity:var(--dmx-opacity-mid)}78%{opacity:calc(0.68*var(--dmx-opacity-peak)+0.32*var(--dmx-opacity-mid))}}
+
+/* ── layout ── */
+#top-bar{position:absolute;top:8px;left:10px;right:10px;display:flex;align-items:center;gap:6px;height:20px}
+.model-name{font-size:10px;font-weight:700;letter-spacing:1px;color:#ffffff;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.status-dot{width:6px;height:6px;border-radius:50%;background:#555;flex-shrink:0}
+.status-dot.online{background:#00ee88;box-shadow:0 0 6px rgba(0,238,136,0.5)}
+.status-dot.generating{background:#00ee88;box-shadow:0 0 10px rgba(0,238,136,0.7);animation:status-pulse 1s ease-in-out infinite}
+@keyframes status-pulse{0%,100%{box-shadow:0 0 6px rgba(0,238,136,0.5)}50%{box-shadow:0 0 14px rgba(0,238,136,0.9)}}
+
+#cache-row{position:absolute;top:30px;left:10px;right:10px;display:flex;align-items:center;gap:6px;height:14px}
+.cache-label{font-size:8px;color:rgba(255,255,255,0.4);letter-spacing:1px;font-weight:700;width:32px}
+.cache-track{flex:1;height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden}
+.cache-fill{height:100%;border-radius:3px;transition:width .5s ease;background:linear-gradient(90deg,#00ee88,#66ffbb)}
+.cache-pct{font-size:9px;font-weight:700;color:rgba(255,255,255,0.6);width:30px;text-align:right;font-variant-numeric:tabular-nums}
+
+#matrix-wrap{position:absolute;top:52px;left:50%;transform:translateX(-50%);width:90px;height:90px;display:flex;align-items:center;justify-content:center}
+
+#stat-grid{position:absolute;top:148px;left:10px;right:10px;bottom:8px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:2px 8px}
+.stat-item{display:flex;flex-direction:column;justify-content:center;gap:1px}
+.stat-label{font-size:7px;font-weight:700;letter-spacing:1.2px;color:rgba(255,255,255,0.25);text-transform:uppercase}
+.stat-val{font-size:14px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums}
+.stat-val.generating{color:#00ee88}
+
+#idle-msg{position:absolute;top:195px;left:10px;right:10px;text-align:center;font-size:8px;color:rgba(255,255,255,0.15);letter-spacing:0.5px}
+</style>
+</head>
+<body>
+
+<div id="top-bar">
+  <span class="model-name" id="modelName">oMLX</span>
+  <span class="status-dot" id="statusDot"></span>
+</div>
+
+<div id="cache-row">
+  <span class="cache-label">CACHE</span>
+  <div class="cache-track"><div class="cache-fill" id="cacheFill" style="width:0%"></div></div>
+  <span class="cache-pct" id="cachePct">0%</span>
+</div>
+
+<div id="matrix-wrap">
+  <div class="dmx-root" id="dmxRoot">
+    <div class="dmx-grid" id="dmxGrid"></div>
+  </div>
+</div>
+
+<div id="stat-grid">
+  <div class="stat-item"><span class="stat-label">TOK/S</span><span class="stat-val" id="statsTok">--</span></div>
+  <div class="stat-item"><span class="stat-label">COMPLETION</span><span class="stat-val" id="statsComp">--</span></div>
+  <div class="stat-item"><span class="stat-label">PROMPT</span><span class="stat-val" id="statsPrompt">--</span></div>
+  <div class="stat-item"><span class="stat-label">REQUESTS</span><span class="stat-val" id="statsReq">--</span></div>
+</div>
+
+<div id="idle-msg">waiting for activity</div>
+
+<script>
+function timeoutSignal(ms){var c=new AbortController;setTimeout(function(){c.abort()},ms);return c.signal}
+
+// ── IP discovery: scan common subnets for R1 Control ──
+var DESKTOP_IPS=[];
+for(var subnet of ['192.168.178.','192.168.1.','192.168.0.','10.0.0.']){
+  for(var i=100;i<=254;i++)DESKTOP_IPS.push(subnet+i);
+}
+var apiBase='';
+var scanIdx=-1;
+var scanning=false;
+
+function tryNextIp(delay){
+  scanIdx++;
+  if(scanIdx>=DESKTOP_IPS.length){scanning=false;setTimeout(function(){scanIdx=-1;tryNextIp(0);},10000);return;}
+  var ip=DESKTOP_IPS[scanIdx];
+  var url='http://'+ip+':9876/omlx/stats';
+  setTimeout(function(){
+    fetch(url,{method:'GET',mode:'cors',signal:timeoutSignal(800)})
+      .then(function(r){return r.json()})
+      .then(function(d){
+        if(d&&typeof d.online!=='undefined'){
+          apiBase='http://'+ip+':9876';
+          scanning=false;
+          applyStats(d);
+          return;
+        }
+        tryNextIp(0);
+      })
+      .catch(function(){tryNextIp(0);});
+  },delay);
+}
+
+function startScan(){
+  if(scanning)return;
+  scanning=true;
+  scanIdx=0;
+  tryNextIp(0);
+}
+
+// ── Loaders: 20 patterns from the dotmatrix library ──
+var loaders=[
+  {name:"ripple",cls:"dmx-ripple",matrix:"full"},
+  {name:"diag",cls:"dmx-diag",matrix:"full"},
+  {name:"spiral",cls:"dmx-spiral",matrix:"full"},
+  {name:"ring",cls:"dmx-ring",matrix:"diamond"},
+  {name:"wave",cls:"dmx-wave",matrix:"full"},
+  {name:"blink",cls:"dmx-blink",matrix:"outline"},
+  {name:"sweep",cls:"dmx-sweep",matrix:"full"},
+  {name:"pulse",cls:"dmx-pulse",matrix:"cross"},
+  {name:"echo",cls:"dmx-echo",matrix:"full"},
+  {name:"ripple2",cls:"dmx-ripple",matrix:"diamond"},
+  {name:"diag2",cls:"dmx-diag",matrix:"diamond"},
+  {name:"spiral2",cls:"dmx-spiral",matrix:"diamond"},
+  {name:"ring2",cls:"dmx-ring",matrix:"outline"},
+  {name:"wave2",cls:"dmx-wave",matrix:"diamond"},
+  {name:"blink2",cls:"dmx-blink",matrix:"diamond"},
+  {name:"sweep2",cls:"dmx-sweep",matrix:"outline"},
+  {name:"pulse2",cls:"dmx-pulse",matrix:"diamond"},
+  {name:"echo2",cls:"dmx-echo",matrix:"diamond"},
+  {name:"ring3",cls:"dmx-ring",matrix:"cross"},
+  {name:"wave3",cls:"dmx-wave",matrix:"cross"}
+];
+
+var MATRIX=5;
+var CENTER=2;
+var loaderIdx=0;
+var isGenerating=false;
+var idleAnim=null;
+var genAnim=null;
+
+var patterns={
+  full:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24],
+  diamond:[6,7,8,11,12,13,16,17,18],
+  outline:[0,1,2,3,4,5,9,10,14,15,19,20,21,22,23,24],
+  cross:[2,6,7,8,10,12,14,16,17,18,22]
+};
+
+function indexToCoord(i){return{row:Math.floor(i/MATRIX),col:i%MATRIX}}
+function distanceFromCenter(i){var c=indexToCoord(i);return Math.abs(c.row-CENTER)+Math.abs(c.col-CENTER)}
+function polarAngle(i){var c=indexToCoord(i);return Math.atan2(c.row-CENTER,c.col-CENTER)}
+function normalizedRadius(i){var c=indexToCoord(i);return Math.sqrt((c.row-CENTER)**2+(c.col-CENTER)**2)/CENTER}
+
+function buildGrid(){
+  var g=document.getElementById('dmxGrid');
+  for(var i=0;i<25;i++){
+    var dot=document.createElement('span');
+    dot.className='dmx-dot';
+    dot.id='dot'+i;
+    dot.style.width='8px';
+    dot.style.height='8px';
+    dot.style.setProperty('--dmx-fill','#00ee88');
+    var dist=distanceFromCenter(i);
+    var angle=polarAngle(i);
+    var rad=normalizedRadius(i);
+    dot.style.setProperty('--dmx-distance',dist);
+    dot.style.setProperty('--dmx-angle',angle);
+    dot.style.setProperty('--dmx-radius',rad);
+    g.appendChild(dot);
+  }
+}
+
+function applyPattern(patternName){
+  var active=new Set(patterns[patternName]||patterns.full);
+  for(var i=0;i<25;i++){
+    var dot=document.getElementById('dot'+i);
+    if(!active.has(i)){
+      dot.className='dmx-dot dmx-inactive';
+      dot.style.animation='none';
+    }else{
+      dot.className='dmx-dot';
+    }
+  }
+}
+
+function setAnimation(animCls){
+  var active=new Set(patterns[loaders[loaderIdx].matrix]||patterns.full);
+  for(var i=0;i<25;i++){
+    var dot=document.getElementById('dot'+i);
+    if(!active.has(i)){
+      dot.className='dmx-dot dmx-inactive';
+      dot.style.animation='none';
+      continue;
+    }
+    var delaySeed=i;
+    if(animCls==='dmx-ring')delaySeed=distanceFromCenter(i);
+    else if(animCls==='dmx-spiral')delaySeed=i;
+    else if(animCls==='dmx-wave')delaySeed=i;
+    else if(animCls==='dmx-ripple')delaySeed=distanceFromCenter(i);
+    var d=(delaySeed+loaderIdx*3)/25;
+    dot.style.setProperty('--d',d);
+    dot.className='dmx-dot '+animCls;
+    dot.style.animation='';
+  }
+}
+
+function nextLoader(){
+  loaderIdx=(loaderIdx+1)%loaders.length;
+  setAnimation(loaders[loaderIdx].cls);
+}
+
+function startIdle(){
+  if(idleAnim)return;
+  applyPattern('diamond');
+  for(var i=0;i<25;i++){
+    var dot=document.getElementById('dot'+i);
+    var d=i/25;
+    dot.style.setProperty('--d',d);
+    dot.className='dmx-dot dmx-echo';
+    dot.style.animation='';
+  }
+}
+
+function stopAll(){
+  if(idleAnim){clearInterval(idleAnim);idleAnim=null;}
+  if(genAnim){clearInterval(genAnim);genAnim=null;}
+}
+
+function fmtNum(n){
+  if(n==null||isNaN(n))return '--';
+  if(n>=1000000)return (n/1000000).toFixed(1)+'M';
+  if(n>=1000)return (n/1000).toFixed(1)+'K';
+  return n.toString();
+}
+
+function fmtRate(n){
+  if(n==null||isNaN(n)||n<=0)return '--';
+  return n.toFixed(1);
+}
+
+// ── API polling ──
+var pollTimer=null;
+var prevGenerating=false;
+
+function pollStats(){
+  if(!apiBase){startScan();return;}
+  var url=apiBase+'/omlx/stats';
+  fetch(url,{method:'GET',mode:'cors',signal:timeoutSignal(3000)})
+    .then(function(r){return r.json()})
+    .then(function(d){
+      if(d&&typeof d.online!=='undefined')applyStats(d);
+      else apiBase='';
+    })
+    .catch(function(){apiBase='';});
+}
+
+function resetSession(){
+  if(!apiBase)return;
+  var url=apiBase+'/omlx/reset';
+  fetch(url,{method:'POST',mode:'cors',signal:timeoutSignal(3000)}).catch(function(){});
+}
+
+function applyStats(d){
+  var modelEl=document.getElementById('modelName');
+  var dotEl=document.getElementById('statusDot');
+  var cacheFill=document.getElementById('cacheFill');
+  var cachePct=document.getElementById('cachePct');
+  var tokEl=document.getElementById('statsTok');
+  var compEl=document.getElementById('statsComp');
+  var promptEl=document.getElementById('statsPrompt');
+  var reqEl=document.getElementById('statsReq');
+  var idleMsg=document.getElementById('idle-msg');
+
+  modelEl.textContent=d.active_model||'oMLX';
+
+  if(d.online){
+    dotEl.className='status-dot online';
+    if(d.generating)dotEl.classList.add('generating');
+  }else{
+    dotEl.className='status-dot';
+  }
+
+  cacheFill.style.width=Math.round(d.cache_percent||0)+'%';
+  cachePct.textContent=Math.round(d.cache_percent||0)+'%';
+
+  tokEl.textContent=fmtRate(d.token_rate);
+  if(d.generating)tokEl.className='stat-val generating';
+  else tokEl.className='stat-val';
+
+  compEl.textContent=fmtNum(d.completion_tokens);
+  promptEl.textContent=fmtNum(d.prompt_tokens);
+  reqEl.textContent=fmtNum(d.total_requests);
+
+  if(d.generating!==prevGenerating){
+    prevGenerating=d.generating;
+    stopAll();
+    if(d.generating){
+      idleMsg.textContent='generating';
+      setAnimation(loaders[loaderIdx].cls);
+      genAnim=setInterval(function(){nextLoader();},3000);
+    }else{
+      idleMsg.textContent='waiting for activity';
+      startIdle();
+    }
+  }
+}
+
+window.addEventListener('sideClick',resetSession);
+
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'||e.key===' '){resetSession();e.preventDefault();}
+});
+
+// ── Init ──
+buildGrid();
+startIdle();
+startScan();
+pollTimer=setInterval(pollStats,2000);
+</script>
+</body>
+</html>
