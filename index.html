@@ -99,41 +99,61 @@ html,body{width:240px;height:282px;overflow:hidden;background:#0d0f12;color:#fff
 <script>
 function timeoutSignal(ms){var c=new AbortController;setTimeout(function(){c.abort()},ms);return c.signal}
 
-// ── IP discovery: scan common subnets for R1 Control ──
+// ── IP discovery: scan all subnets in parallel ──
 var DESKTOP_IPS=[];
-for(var subnet of ['192.168.178.','192.168.1.','192.168.0.','10.0.0.']){
-  for(var i=100;i<=254;i++)DESKTOP_IPS.push(subnet+i);
+for(var subnet of ['192.168.178.','192.168.1.','192.168.0.','10.0.0.','192.168.2.','192.168.86.','172.16.0.','172.20.10.']){
+  for(var i=1;i<=254;i++)DESKTOP_IPS.push(subnet+i);
 }
 var apiBase='';
-var scanIdx=-1;
 var scanning=false;
-
-function tryNextIp(delay){
-  scanIdx++;
-  if(scanIdx>=DESKTOP_IPS.length){scanning=false;setTimeout(function(){scanIdx=-1;tryNextIp(0);},10000);return;}
-  var ip=DESKTOP_IPS[scanIdx];
-  var url='http://'+ip+':9876/omlx/stats';
-  setTimeout(function(){
-    fetch(url,{method:'GET',mode:'cors',signal:timeoutSignal(800)})
-      .then(function(r){return r.json()})
-      .then(function(d){
-        if(d&&typeof d.online!=='undefined'){
-          apiBase='http://'+ip+':9876';
-          scanning=false;
-          applyStats(d);
-          return;
-        }
-        tryNextIp(0);
-      })
-      .catch(function(){tryNextIp(0);});
-  },delay);
-}
+var scanDone=false;
+var scanCooldown=0;
 
 function startScan(){
   if(scanning)return;
+  var now=Date.now();
+  if(scanCooldown>now)return;
   scanning=true;
-  scanIdx=0;
-  tryNextIp(0);
+  var idleMsg=document.getElementById('idle-msg');
+  if(idleMsg)idleMsg.textContent='scanning network...';
+
+  // Batch concurrent fetches — try 50 IPs at a time
+  var BATCH=50;
+  var idx=0;
+  var found=false;
+
+  function tryBatch(){
+    if(found||idx>=DESKTOP_IPS.length){
+      if(!found){
+        scanning=false;
+        scanDone=true;
+        scanCooldown=Date.now()+30000;
+        if(idleMsg)idleMsg.textContent='no server found';
+      }
+      return;
+    }
+    var batch=[];
+    for(var j=0;j<BATCH&&idx<DESKTOP_IPS.length;j++,idx++){
+      var ip=DESKTOP_IPS[idx];
+      batch.push(
+        fetch('http://'+ip+':9876/omlx/stats',{method:'GET',mode:'cors',signal:timeoutSignal(400)})
+          .then(function(r){return r.json()})
+          .then(function(d){
+            if(!found&&d&&typeof d.online!=='undefined'){
+              found=true;
+              apiBase='http://'+ip+':9876';
+              scanning=false;
+              if(idleMsg)idleMsg.textContent='connected';
+              applyStats(d);
+            }
+          })
+          .catch(function(){})
+      );
+    }
+    Promise.all(batch).then(function(){tryBatch();}).catch(function(){tryBatch();});
+  }
+
+  tryBatch();
 }
 
 // ── Loaders: curated circle/spherical patterns from dotmatrix ──
