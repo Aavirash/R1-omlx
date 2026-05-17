@@ -136,28 +136,16 @@ function startScan(){
   tryNextIp(0);
 }
 
-// ── Loaders: 20 patterns from the dotmatrix library ──
+// ── Loaders: curated circle/spherical patterns from dotmatrix ──
 var loaders=[
   {name:"ripple",cls:"dmx-ripple",matrix:"full"},
-  {name:"diag",cls:"dmx-diag",matrix:"full"},
+  {name:"ring",cls:"dmx-ring",matrix:"outline"},
   {name:"spiral",cls:"dmx-spiral",matrix:"full"},
-  {name:"ring",cls:"dmx-ring",matrix:"diamond"},
   {name:"wave",cls:"dmx-wave",matrix:"full"},
-  {name:"blink",cls:"dmx-blink",matrix:"outline"},
-  {name:"sweep",cls:"dmx-sweep",matrix:"full"},
-  {name:"pulse",cls:"dmx-pulse",matrix:"cross"},
-  {name:"echo",cls:"dmx-echo",matrix:"full"},
   {name:"ripple2",cls:"dmx-ripple",matrix:"diamond"},
-  {name:"diag2",cls:"dmx-diag",matrix:"diamond"},
+  {name:"ring2",cls:"dmx-ring",matrix:"circle"},
   {name:"spiral2",cls:"dmx-spiral",matrix:"diamond"},
-  {name:"ring2",cls:"dmx-ring",matrix:"outline"},
-  {name:"wave2",cls:"dmx-wave",matrix:"diamond"},
-  {name:"blink2",cls:"dmx-blink",matrix:"diamond"},
-  {name:"sweep2",cls:"dmx-sweep",matrix:"outline"},
-  {name:"pulse2",cls:"dmx-pulse",matrix:"diamond"},
-  {name:"echo2",cls:"dmx-echo",matrix:"diamond"},
-  {name:"ring3",cls:"dmx-ring",matrix:"cross"},
-  {name:"wave3",cls:"dmx-wave",matrix:"cross"}
+  {name:"wave2",cls:"dmx-wave",matrix:"circle"}
 ];
 
 var MATRIX=5;
@@ -167,12 +155,24 @@ var isGenerating=false;
 var idleAnim=null;
 var genAnim=null;
 
+// Circle pattern on 5×5 — spherical ring
+function circlePattern(){
+  var c=[];
+  for(var i=0;i<25;i++){
+    var coord=indexToCoord(i);
+    var dist=Math.sqrt((coord.row-CENTER)**2+(coord.col-CENTER)**2);
+    if(dist>0.5&&dist<=2.2)c.push(i);
+  }
+  return c;
+}
+
 var patterns={
   full:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24],
   diamond:[6,7,8,11,12,13,16,17,18],
   outline:[0,1,2,3,4,5,9,10,14,15,19,20,21,22,23,24],
   cross:[2,6,7,8,10,12,14,16,17,18,22]
 };
+patterns.circle=circlePattern();
 
 function indexToCoord(i){return{row:Math.floor(i/MATRIX),col:i%MATRIX}}
 function distanceFromCenter(i){var c=indexToCoord(i);return Math.abs(c.row-CENTER)+Math.abs(c.col-CENTER)}
@@ -211,8 +211,8 @@ function applyPattern(patternName){
   }
 }
 
-function setAnimation(animCls){
-  var active=new Set(patterns[loaders[loaderIdx].matrix]||patterns.full);
+function setAnimation(animCls,patternName,delayOffset){
+  var active=new Set(patterns[patternName]||patterns.full);
   for(var i=0;i<25;i++){
     var dot=document.getElementById('dot'+i);
     if(!active.has(i)){
@@ -222,29 +222,25 @@ function setAnimation(animCls){
     }
     var delaySeed=i;
     if(animCls==='dmx-ring')delaySeed=distanceFromCenter(i);
-    else if(animCls==='dmx-spiral')delaySeed=i;
+    else if(animCls==='dmx-spiral')delaySeed=distanceFromCenter(i);
     else if(animCls==='dmx-wave')delaySeed=i;
     else if(animCls==='dmx-ripple')delaySeed=distanceFromCenter(i);
-    var d=(delaySeed+loaderIdx*3)/25;
+    var d=((delaySeed)+(delayOffset||0))/25;
     dot.style.setProperty('--d',d);
     dot.className='dmx-dot '+animCls;
     dot.style.animation='';
   }
 }
 
-function nextLoader(){
+function nextLoader(delayOffset){
   loaderIdx=(loaderIdx+1)%loaders.length;
-  setAnimation(loaders[loaderIdx].cls);
+  setAnimation(loaders[loaderIdx].cls,loaders[loaderIdx].matrix,delayOffset||0);
 }
 
 function startIdle(){
   if(idleAnim)return;
-  loaderIdx=0;
-  setAnimation(loaders[loaderIdx].cls);
-  idleAnim=setInterval(function(){
-    loaderIdx=(loaderIdx+1)%loaders.length;
-    setAnimation(loaders[loaderIdx].cls);
-  },4000);
+  // One smooth, continuous "echo" pulse on the circle pattern — always alive
+  setAnimation('dmx-echo','circle',0);
 }
 
 function stopAll(){
@@ -267,6 +263,8 @@ function fmtRate(n){
 // ── API polling ──
 var pollTimer=null;
 var prevGenerating=false;
+var prevCompTokens=0;
+var compTokensStable=0; // how many consecutive polls with no token change
 
 function pollStats(){
   if(!apiBase){startScan();return;}
@@ -274,8 +272,20 @@ function pollStats(){
   fetch(url,{method:'GET',mode:'cors',signal:timeoutSignal(3000)})
     .then(function(r){return r.json()})
     .then(function(d){
-      if(d&&typeof d.online!=='undefined')applyStats(d);
-      else apiBase='';
+      if(d&&typeof d.online!=='undefined'){
+        // Client-side generating detection — more responsive than server
+        if(typeof d.completion_tokens!=='undefined'){
+          if(d.completion_tokens>prevCompTokens){
+            d.generating=true;
+            compTokensStable=0;
+          }else{
+            compTokensStable++;
+            if(compTokensStable>=2)d.generating=false; // idle after 2 no-change polls
+          }
+          prevCompTokens=d.completion_tokens;
+        }
+        applyStats(d);
+      }else apiBase='';
     })
     .catch(function(){apiBase='';});
 }
@@ -321,9 +331,10 @@ function applyStats(d){
     prevGenerating=d.generating;
     stopAll();
     if(d.generating){
+      loaderIdx=0;
       idleMsg.textContent='generating';
-      setAnimation(loaders[loaderIdx].cls);
-      genAnim=setInterval(function(){nextLoader();},3000);
+      setAnimation(loaders[loaderIdx].cls,loaders[loaderIdx].matrix,0);
+      genAnim=setInterval(function(){nextLoader(loaderIdx*3);},2000);
     }else{
       idleMsg.textContent='waiting for activity';
       startIdle();
@@ -338,7 +349,7 @@ document.addEventListener('keydown',function(e){
 });
 
 // ── Cache buster: if this is a stale cached version, force reload ──
-var APP_VERSION=3;
+var APP_VERSION=4;
 // GitHub Pages may cache index.html up to 10 min. On first load, store version
 try{
   var v=localStorage.getItem('omlx_ver');
